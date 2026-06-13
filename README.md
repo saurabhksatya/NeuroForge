@@ -107,4 +107,4 @@ Visualization & Comparison
 
 **Currently in Development**
 
-This project is being developed as a web-based machine learning platform focused on simplifying model training, evaluation, visualization, and prediction workflows for end users.
+This project is being developed as a web-based machine learning platform focused on simplifying model training, evaluation, visualization, and prediction workflows for end users..
