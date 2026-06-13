@@ -3,14 +3,14 @@ name: Build and Push to GHCR
 on:
   push:
     branches:
-      - main  # Triggers the workflow on pushes to the main branch
+      - main # Triggers the workflow on pushes to the main branch
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write  # Critical permission to allow uploads to GHCR
+      packages: write # Critical permission to allow uploads to GHCR
 
     steps:
       - name: Checkout Repository
@@ -21,7 +21,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
