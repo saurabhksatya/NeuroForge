@@ -16,6 +16,8 @@ interface SelectionProps {
   onMaxDepthChange: (value: number) => void;
   knnK: number;
   onKnnKChange: (value: number) => void;
+  customFile: File | null;
+  onCustomFileChange: (file: File | null) => void;
 }
 
 export default function Selection({
@@ -31,11 +33,41 @@ export default function Selection({
   onMaxDepthChange,
   knnK,
   onKnnKChange,
+  customFile,
+  onCustomFileChange,
 }: SelectionProps) {
   const [targetOptions, setTargetOptions] = useState<string[]>([]);
 
   useEffect(() => {
     const loadHeaders = async () => {
+      if (selectedDataset === "custom") {
+        if (!customFile) {
+          setTargetOptions([]);
+          return;
+        }
+        try {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const text = e.target?.result as string;
+            const firstLine = text.split("\n")[0];
+            if (!firstLine) return;
+            const headers = firstLine
+              .split(/[,;]/)
+              .map((column) => column.trim().replace(/^['"]|['"]$/g, ""))
+              .filter(Boolean);
+
+            setTargetOptions(headers);
+            if (!headers.includes(selectedTarget) && headers[0]) {
+              onTargetChange(headers[0]);
+            }
+          };
+          reader.readAsText(customFile);
+        } catch {
+          setTargetOptions([]);
+        }
+        return;
+      }
+
       const dataset = datasets.find((item) => item.id === selectedDataset);
       if (!dataset) return;
 
@@ -63,30 +95,62 @@ export default function Selection({
     };
 
     loadHeaders();
-  }, [selectedDataset]);
+  }, [selectedDataset, customFile]);
 
   const handleModelChange = (value: string) => {
     onModelChange(value);
   };
 
   return (
-    <section className="glass-panel p-lg rounded-xl gap-xl space-y-6 items-end">
-      <div className="flex flex-row gap-xs ">
-        <div className="flex flex-col gap-xs grow">
-          <label className="font-label-mono text-label-mono text-on-surface-variant">
-            SELECT DATASET
-          </label>
-          <select
-            value={selectedDataset}
-            onChange={(event) => onDatasetChange(event.target.value)}
-            className="bg-surface-container-low border border-outline-variant rounded-lg p-sm focus:border-primary focus:ring-0 text-on-surface"
-          >
-            {datasets.map((dataset) => (
-              <option key={dataset.id} value={dataset.id}>
-                {dataset.label}
-              </option>
-            ))}
-          </select>
+    <>
+      <section className="glass-panel p-lg rounded-xl gap-xl space-y-6 items-end">
+        <div className="flex flex-row gap-xs ">
+          <div className="flex flex-col gap-xs grow">
+            <label className="font-label-mono text-label-mono text-on-surface-variant">
+              SELECT DATASET
+            </label>
+            <select
+              value={selectedDataset}
+              onChange={(event) => onDatasetChange(event.target.value)}
+              className="bg-surface-container-low border border-outline-variant rounded-lg p-sm focus:border-primary focus:ring-0 text-on-surface"
+            >
+              {datasets.map((dataset) => (
+                <option key={dataset.id} value={dataset.id}>
+                  {dataset.label}
+                </option>
+              ))}
+              <option value="custom">Upload Custom Dataset...</option>
+            </select>
+          </div>
+
+          {selectedDataset === "custom" && (
+            <div className="flex flex-col gap-xs grow min-w-[200px]">
+              <label className="font-label-mono text-label-mono text-on-surface-variant">
+                UPLOAD FILE (.CSV)
+              </label>
+              <label className="flex items-center justify-center border border-dashed border-outline-variant hover:border-primary transition-colors rounded-lg p-sm cursor-pointer bg-surface-container-low text-center h-[42px]">
+                {customFile ? (
+                  <div className="flex items-center gap-xs text-primary font-medium text-sm">
+                    <span className="truncate max-w-[150px]">
+                      {customFile.name}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-on-surface-variant text-xs gap-1">
+                    <span>Select CSV File</span>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept=".csv"
+                  className="hidden"
+                  onChange={(e) =>
+                    e.target.files && onCustomFileChange(e.target.files[0])
+                  }
+                />
+              </label>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-xs grow">
@@ -105,82 +169,92 @@ export default function Selection({
             ))}
           </select>
         </div>
-      </div>
 
-      <div className="col-span-1 md:col-span-2 grid grid-cols-1 gap-md">
-        <div className="flex flex-row gap-xs">
-          {modelOptions.map((model) => (
-            <label
-              key={model.value}
-              className="flex items-center gap-xs rounded-md px-sm py-2 hover:bg-surface-hover cursor-pointer grow"
-            >
+        <div className="col-span-1 md:col-span-2 grid grid-cols-1 gap-md">
+          <div className="flex flex-row gap-xs">
+            {modelOptions.map((model) => (
+              <label
+                key={model.value}
+                className="flex items-center gap-xs rounded-md px-sm py-2 hover:bg-surface-hover cursor-pointer grow"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedModels.includes(model.value)}
+                  onChange={() => handleModelChange(model.value)}
+                  className="h-4 w-4 rounded border appearance-none checked:appearance-auto not-checked:bg-white text-primary focus:ring-primary"
+                />
+                <span>{model.label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-md">
+            <div className="flex flex-col gap-xs">
+              <div className="flex justify-between items-center">
+                <label className="font-label-mono text-label-mono text-on-surface-variant">
+                  RF TREES
+                </label>
+                <span
+                  className="font-label-mono text-primary"
+                  id="rf-trees-val"
+                >
+                  {rfTrees}
+                </span>
+              </div>
               <input
-                type="checkbox"
-                checked={selectedModels.includes(model.value)}
-                onChange={() => handleModelChange(model.value)}
-                className="h-4 w-4 rounded border appearance-none checked:appearance-auto not-checked:bg-white text-primary focus:ring-primary"
+                className="custom-slider"
+                max="200"
+                min="1"
+                type="range"
+                value={rfTrees}
+                onChange={(event) =>
+                  onRfTreesChange(Number(event.target.value))
+                }
               />
-              <span>{model.label}</span>
-            </label>
-          ))}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-md">
-          <div className="flex flex-col gap-xs">
-            <div className="flex justify-between items-center">
-              <label className="font-label-mono text-label-mono text-on-surface-variant">
-                RF TREES
-              </label>
-              <span className="font-label-mono text-primary" id="rf-trees-val">
-                {rfTrees}
-              </span>
             </div>
-            <input
-              className="custom-slider"
-              max="200"
-              min="1"
-              type="range"
-              value={rfTrees}
-              onChange={(event) => onRfTreesChange(Number(event.target.value))}
-            />
-          </div>
-          <div className="flex flex-col gap-xs">
-            <div className="flex justify-between items-center">
-              <label className="font-label-mono text-label-mono text-on-surface-variant">
-                MAX DEPTH
-              </label>
-              <span className="font-label-mono text-primary" id="max-depth-val">
-                {maxDepth}
-              </span>
+            <div className="flex flex-col gap-xs">
+              <div className="flex justify-between items-center">
+                <label className="font-label-mono text-label-mono text-on-surface-variant">
+                  MAX DEPTH
+                </label>
+                <span
+                  className="font-label-mono text-primary"
+                  id="max-depth-val"
+                >
+                  {maxDepth}
+                </span>
+              </div>
+              <input
+                className="custom-slider"
+                max="20"
+                min="1"
+                type="range"
+                value={maxDepth}
+                onChange={(event) =>
+                  onMaxDepthChange(Number(event.target.value))
+                }
+              />
             </div>
-            <input
-              className="custom-slider"
-              max="20"
-              min="1"
-              type="range"
-              value={maxDepth}
-              onChange={(event) => onMaxDepthChange(Number(event.target.value))}
-            />
-          </div>
-          <div className="flex flex-col gap-xs">
-            <div className="flex justify-between items-center">
-              <label className="font-label-mono text-label-mono text-on-surface-variant">
-                KNN K
-              </label>
-              <span className="font-label-mono text-primary" id="knn-val">
-                {knnK}
-              </span>
+            <div className="flex flex-col gap-xs">
+              <div className="flex justify-between items-center">
+                <label className="font-label-mono text-label-mono text-on-surface-variant">
+                  KNN K
+                </label>
+                <span className="font-label-mono text-primary" id="knn-val">
+                  {knnK}
+                </span>
+              </div>
+              <input
+                className="custom-slider"
+                max="15"
+                min="1"
+                type="range"
+                value={knnK}
+                onChange={(event) => onKnnKChange(Number(event.target.value))}
+              />
             </div>
-            <input
-              className="custom-slider"
-              max="15"
-              min="1"
-              type="range"
-              value={knnK}
-              onChange={(event) => onKnnKChange(Number(event.target.value))}
-            />
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

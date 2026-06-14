@@ -11,6 +11,7 @@ interface ModelAnswerProps {
   rfTrees: number;
   maxDepth: number;
   knnK: number;
+  customFile: File | null;
   onResultUpdate?: (
     modelName: string,
     result: ModelResultSummary | null,
@@ -34,6 +35,7 @@ export default function ModelAnswer({
   rfTrees,
   maxDepth,
   knnK,
+  customFile,
   onResultUpdate,
 }: ModelAnswerProps) {
   const [modelResult, setModelResult] = useState<ModelResult | null>(null);
@@ -41,23 +43,37 @@ export default function ModelAnswer({
 
   useEffect(() => {
     const trainModel = async () => {
+      if (selectedDataset === "custom" && !customFile) {
+        return;
+      }
+      if (!selectedTarget) {
+        return;
+      }
+
       try {
         setLoading(true);
-        // Get dataset file path
-        const dataset = datasets.find((d) => d.id === selectedDataset);
-        if (!dataset) {
-          console.error("Dataset not found");
-          return;
-        }
+        let file: File;
 
-        // Fetch the CSV file
-        const fileResponse = await fetch(dataset.file);
-        if (!fileResponse.ok) {
-          console.error("Failed to fetch dataset file");
-          return;
+        if (selectedDataset === "custom") {
+          if (!customFile) return;
+          file = customFile;
+        } else {
+          // Get dataset file path
+          const dataset = datasets.find((d) => d.id === selectedDataset);
+          if (!dataset) {
+            console.error("Dataset not found");
+            return;
+          }
+
+          // Fetch the CSV file
+          const fileResponse = await fetch(dataset.file);
+          if (!fileResponse.ok) {
+            console.error("Failed to fetch dataset file");
+            return;
+          }
+          const blob = await fileResponse.blob();
+          file = new File([blob], dataset.file, { type: "text/csv" });
         }
-        const blob = await fileResponse.blob();
-        const file = new File([blob], dataset.file, { type: "text/csv" });
 
         // Prepare config
         const config = {
@@ -77,14 +93,28 @@ export default function ModelAnswer({
         formData.append("file", file);
 
         // Send request to backend
-        const response = await fetch(process.env.NEXT_PUBLIC_BACKEND_URL + "/train" || "http://localhost:8000/train", {
-          method: "POST",
-          body: formData,
-        });
+        const response = await fetch(
+          (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000") +
+            "/train",
+          {
+            method: "POST",
+            body: formData,
+          },
+        );
 
         if (!response.ok) {
-          const error = await response.json();
-          console.error(`Error training model ${modelName}:`, error);
+          let errorMsg = "Unknown error";
+          try {
+            const errorData = await response.json();
+            errorMsg = errorData.detail || JSON.stringify(errorData);
+          } catch {
+            try {
+              errorMsg = await response.text();
+            } catch {
+              errorMsg = `Server returned status ${response.status}`;
+            }
+          }
+          console.error(`Error training model ${modelName}:`, errorMsg);
           return;
         }
 
@@ -117,6 +147,7 @@ export default function ModelAnswer({
   }, [
     modelName,
     selectedDataset,
+    customFile,
     selectedTarget,
     rfTrees,
     maxDepth,

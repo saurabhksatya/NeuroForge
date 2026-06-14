@@ -28,6 +28,7 @@ export default function Home() {
   const [rfTrees, setRfTrees] = useState(100);
   const [maxDepth, setMaxDepth] = useState(10);
   const [knnK, setKnnK] = useState(5);
+  const [customFile, setCustomFile] = useState<File | null>(null);
   const [modelResults, setModelResults] = useState<
     Record<string, ModelResultSummary>
   >({});
@@ -93,6 +94,7 @@ export default function Home() {
             setKnnK(5);
             setModelResults({});
             setSelectedDataset(value);
+            setCustomFile(null);
           }}
           selectedTarget={selectedTarget}
           onTargetChange={(value) => {
@@ -117,6 +119,8 @@ export default function Home() {
           onMaxDepthChange={setMaxDepth}
           knnK={knnK}
           onKnnKChange={setKnnK}
+          customFile={customFile}
+          onCustomFileChange={setCustomFile}
         />
         {selectedModels.length > 0 && (
           <section className="glass-panel rounded-xl p-lg space-y-6">
@@ -189,6 +193,7 @@ export default function Home() {
             rfTrees={rfTrees}
             maxDepth={maxDepth}
             knnK={knnK}
+            customFile={customFile}
             onResultUpdate={handleResultUpdate}
           />
         ))}

@@ -38,12 +38,16 @@ RUN --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync
 
 # Switch to the non-privileged user to run the application.
-USER appuser
-
-ENV UV_CACHE_DIR=/tmp/uv_cache
 
 # Copy the source code into the container.
 COPY . .
+
+# Ensure writable app directories for the runtime user.
+RUN mkdir -p /app/models && chown -R appuser:appuser /app
+
+USER appuser
+
+ENV UV_CACHE_DIR=/tmp/uv_cache
 
 # Expose the port that the application listens on.
 EXPOSE 8000

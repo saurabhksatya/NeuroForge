@@ -14,6 +14,7 @@ from sklearn.metrics import (
 )
 
 import pandas as pd
+import difflib
 
 
 def train_models(
@@ -25,6 +26,41 @@ def train_models(
     knn_neighbors: int = 5,
     gb_estimators: int = 100,
 ):
+    # Resolve target column robustly (case-insensitive / stripped / fuzzy)
+    def _resolve_column(df: pd.DataFrame, col_name: str) -> str:
+        if col_name in df.columns:
+            return col_name
+        # case-insensitive exact match
+        lower_map = {c.lower(): c for c in df.columns}
+        if col_name.lower() in lower_map:
+            return lower_map[col_name.lower()]
+        # stripped spaces match
+        stripped_map = {c.replace(' ', '').lower(): c for c in df.columns}
+        key = col_name.replace(' ', '').lower()
+        if key in stripped_map:
+            return stripped_map[key]
+        # fuzzy match using difflib
+        matches = difflib.get_close_matches(col_name, list(df.columns), n=1, cutoff=0.6)
+        if matches:
+            return matches[0]
+        raise ValueError(f"Target column '{col_name}' not found. Available columns: {list(df.columns)}")
+
+    try:
+        target_variable = _resolve_column(df, target_variable)
+    except ValueError:
+        # Propagate the message upward so the API can return a 400 with a clear message
+        raise
+
+    # Convert columns (except target) to numeric if possible
+    for col in df.columns:
+        if col != target_variable:
+            try:
+                converted = pd.to_numeric(df[col], errors='coerce')
+                if not converted.isnull().all():
+                    df[col] = converted
+            except Exception:
+                pass
+
     # ----------------------------------------
     # Missing Values
     # ----------------------------------------
@@ -46,8 +82,14 @@ def train_models(
     X = df.drop(columns=[target_variable])
     y = df[target_variable].astype(str)
 
-    # One-hot encode categorical features
-    X = pd.get_dummies(X, drop_first=True)
+    # Select only numeric features to remove string values
+    X = X.select_dtypes(include=['number'])
+
+    # Raise error if no numeric features remain
+    if X.shape[1] == 0:
+        raise ValueError(
+            "Dataset must contain at least one numeric feature column for training."
+        )
 
     # Remove rare classes
     class_counts = y.value_counts()

@@ -161,10 +161,18 @@ export default function NeuralTrainPage() {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(
-          errData.detail || "Server error running training pipeline.",
-        );
+        let errorMsg = "Server error running training pipeline.";
+        try {
+          const errData = await response.json();
+          errorMsg = errData.detail || JSON.stringify(errData);
+        } catch {
+          try {
+            errorMsg = await response.text();
+          } catch {
+            errorMsg = `Server returned status ${response.status}`;
+          }
+        }
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();

@@ -46,6 +46,23 @@ async def validate_file_size(file: UploadFile):
         pass
 
 
+def read_csv_safely(file: UploadFile) -> pd.DataFrame:
+    try:
+        content = file.file.read(2048)
+        file.file.seek(0)
+        content_str = content.decode("utf-8", errors="ignore")
+        first_line = content_str.split("\n")[0]
+        if ";" in first_line and first_line.count(";") > first_line.count(","):
+            sep = ";"
+        elif "\t" in first_line:
+            sep = "\t"
+        else:
+            sep = ","
+    except Exception:
+        sep = ","
+    return pd.read_csv(file.file, sep=sep)
+
+
 def validate_df_dimensions(df: pd.DataFrame, name: str):
     if len(df) > MAX_ROWS:
         raise HTTPException(
@@ -126,7 +143,7 @@ async def train(
     await validate_file_size(file)
 
     if file.filename.endswith(".csv"):
-        df = pd.read_csv(file.file)
+        df = read_csv_safely(file)
 
     elif file.filename.endswith(".xlsx"):
         df = pd.read_excel(file.file)
@@ -150,15 +167,18 @@ async def train(
     if settings.knn_neighbors > 50 or settings.knn_neighbors < 1:
         raise HTTPException(status_code=400, detail="k-NN neighbors must be between 1 and 50.")
 
-    result = train_models(
-        df=df,
-        target_variable=settings.target_column,
-        selected_models=settings.models,
-        rf_n_estimators=settings.rf_n_estimators,
-        rf_max_depth=settings.rf_max_depth,
-        knn_neighbors=settings.knn_neighbors,
-        gb_estimators=settings.gb_estimators,
-    )
+    try:
+        result = train_models(
+            df=df,
+            target_variable=settings.target_column,
+            selected_models=settings.models,
+            rf_n_estimators=settings.rf_n_estimators,
+            rf_max_depth=settings.rf_max_depth,
+            knn_neighbors=settings.knn_neighbors,
+            gb_estimators=settings.gb_estimators,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     return result
 
@@ -199,7 +219,7 @@ async def neural_train(
 
     # Load train file
     if train_file.filename.endswith(".csv"):
-        df_train = pd.read_csv(train_file.file)
+        df_train = read_csv_safely(train_file)
     elif train_file.filename.endswith(".xlsx"):
         df_train = pd.read_excel(train_file.file)
     else:
@@ -207,7 +227,7 @@ async def neural_train(
 
     # Load test file
     if test_file.filename.endswith(".csv"):
-        df_test = pd.read_csv(test_file.file)
+        df_test = read_csv_safely(test_file)
     elif test_file.filename.endswith(".xlsx"):
         df_test = pd.read_excel(test_file.file)
     else:
