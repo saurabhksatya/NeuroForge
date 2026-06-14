@@ -1,9 +1,7 @@
 name: Build and Push to GHCR
 
 on:
-  push:
-    branches:
-      - main # Triggers the workflow on pushes to the main branch
+  workflow_dispatch: # Triggers the workflow only when manually run
 
 jobs:
   build-and-push:
